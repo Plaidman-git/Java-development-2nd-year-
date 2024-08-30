@@ -1,0 +1,41 @@
+public class MyClass {
+    public static void main(String args[]) {
+ 
+      int x = 1;
+      double y1 = 1;
+      double y2 = 1;
+      double y3 = 1;
+  
+      if (x < -0.5) {
+          y1 = 1+Math.pow(Math.sin(x+0.5),3);
+      }
+      else if (x > 0.5) {
+          y1 = 1+Math.pow(Math.sin(x-0.5),3);
+      }
+      else {
+          y1 = 1;
+      }
+      
+      if (x <= 0) {
+          y2 = x + Math.pow(2.718,-x);
+      }
+      else if (x >= 1) {
+          y2 = 1+(x-1)*(x-1);
+      }
+      else {
+          y2 = 1;
+      }
+      
+      if (x <= -1) {
+          y3 = -Math.cos((x+1)/2);
+      }
+      else if (x >= 1) {
+          y3 = Math.cos((x-1)/2);
+      }
+      else {
+          y3 = Math.sin(3.14*x/2);
+      }
+
+      System.out.println("y1 = " + y1 + ", y2 = " + y2 + ", y3 = " + y3);
+    }
+}
