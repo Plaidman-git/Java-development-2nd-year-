@@ -1,0 +1,65 @@
+#1)
+public class MyClass {
+    public static void main(String args[]) {
+ 
+      int x = 1;
+      int i = 1;
+      int n = 30;
+      int f = 0;
+      double S = 0;
+
+
+
+    while (i != n) {
+        S += (Math.pow(2.718, x/i)+Math.pow(2.718, -x/i))/Math.pow(i+2, 4);
+        i ++;
+    }
+      System.out.println("S = " + S);
+    }
+}
+#2)
+import java.util.ArrayList;
+public class MyClass {
+    public static void main(String args[]) {
+        int[] nums = new int[] { 1, 2, 3, 5, 5, 4 }; // <= 40 элементов
+        ArrayList<Integer> nums2 = new ArrayList<Integer>();
+        int max = nums[0];
+        for (int i = 0; i < nums.length; i++) {
+            max = Math.max(max, nums[i]);
+        }
+        for (int i = 0; i < nums.length; i++) {
+            if (nums[i] != max) {
+                nums2.add(nums[i]);
+            }
+        }
+
+        System.out.println("Новая последовательность " + nums2);
+    }
+}
+#3)
+public class MyClass {
+    public static void main(String args[]) {
+ 
+        int[] nums = new int[] { 1, -2, 3, -5, 5, -4, 0 };
+        double poz = 0;
+        double neg = 0;
+        double kol_poz = 0;
+        double kol_neg = 0;
+        double sum_poz = 0;
+        double sum_neg = 0;
+
+        for (int i = 0; i < nums.length; i++) {
+            if (nums[i]>0) {
+                sum_poz += nums[i];
+                kol_poz ++;
+            }
+            if (nums[i]<0) {
+                sum_neg += nums[i];
+                kol_neg ++;
+            }
+        }
+        poz = sum_poz / kol_poz;
+        neg = sum_neg / kol_neg;
+        System.out.println("Положительных: " + poz + "; Отрицательных: " + neg);
+    }
+}
