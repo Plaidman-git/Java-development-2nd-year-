@@ -1,0 +1,24 @@
+public class MyClass {
+    public static void main(String args[]) {
+      int a = 1;
+      int b = 1;
+      int c = 1;
+      int x = 1;
+      int y = 1;
+      int p = 1;
+      double z1 = Math.pow((x*x-y*y), (1/5)) / (x*Math.pow((a*y), (1/2))+y*Math.pow((b*x), (1/2)));
+      double z2 = (x*x*x + a*x*x + b*x + c) / (Math.pow(Math.abs(x-a), 1/2) + Math.pow(Math.abs(y-b), 1/2)) * (a*Math.cos(x/p) + b * Math.sin(y/p));
+      double z3 = 1;
+      if (x <= 3.14/2) {
+          z3 = 0;
+      }
+      else if (x > 0) {
+          z3 = 1;
+      }
+      else {
+          z3 = Math.cos(x);
+      }
+
+      System.out.println("z1 = " + z1 + ", z2 = " + z2 + ", z3 = " + z3);
+    }
+}
