@@ -1,0 +1,728 @@
+Main.java
+
+package src;
+public class Main {
+public static void main(String[] args) {
+new Interface(600, 600);
+}
+}
+
+Interface.java
+
+package src;
+
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
+
+import java.awt.*;
+import java.awt.event.*;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.util.Scanner;
+
+class Interface extends Frame implements ActionListener {
+    private int lineNumber = 22; // количество строк
+    // Конструктор окна
+    private Menu fileMenu;
+    private MenuBar mainMenuBar;
+    private MenuItem newFileItem;
+    private TabWidget tabWidget;
+    private Program program;
+    private int kompKey = 1;
+
+    Interface(int height, int width) {
+        // Заголовок окна
+        setTitle("kursach");
+        setBounds(100, 50, width, height);
+        setBackground(Color.GRAY);
+        setLayout(new GridLayout());
+        addWindowListener(
+                new WindowAdapter() {
+                    public void windowClosing(WindowEvent ve) {
+                        System.exit(0);
+                    }
+                }
+        );
+        mainMenuBar = new MenuBar();
+        fileMenu = new Menu("file");
+        newFileItem = new MenuItem("Open", new MenuShortcut(KeyEvent.VK_N));
+        newFileItem.setActionCommand("Open");
+        newFileItem.addActionListener(this);
+        fileMenu.add(newFileItem);//adds item to menu
+        mainMenuBar.add(fileMenu);//add menu to menu bar
+        setMenuBar(mainMenuBar);//sets menu bar for window
+        tabWidget = new TabWidget(lineNumber);
+        add(tabWidget);
+        setResizable(false);
+        setVisible(true);
+        program = new Program(lineNumber);
+    }
+    public void actionPerformed(ActionEvent e) {
+        FileDialog fd = new FileDialog(this, "Choose a file", FileDialog.LOAD);
+        fd.setVisible(true);
+        String path = fd.getDirectory() + fd.getFile();
+        Float[][] x = new Float[3][lineNumber];
+        Float[] y = new Float[lineNumber];
+        try {
+            File file = new File(String.format("/%s", path));
+            Scanner scanner = new Scanner(file);
+            //System.out.println("file opened");
+            int i = 0;
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine();
+                String[] splitLine = line.split(" ");
+                x[0][i] = Float.parseFloat(splitLine[0]);
+                x[1][i] = Float.parseFloat(splitLine[1]);
+                x[2][i] = Float.parseFloat(splitLine[2]);
+                y[i] = Float.parseFloat(splitLine[3]);
+                i++;
+            }
+            scanner.close();
+            //заполнить таблицы
+            this.tabWidget.showDataPanel.myTableModel.insertIntoRow(1, x[0]);
+            this.tabWidget.showDataPanel.myTableModel.insertIntoRow(2, x[1]);
+            this.tabWidget.showDataPanel.myTableModel.insertIntoRow(3, x[2]);
+            this.tabWidget.showDataPanel.myTableModel.insertIntoRow(4, y);
+            ResultsContainer resContainer = program.calculate(x, y);
+            RegressionResFunc regressionRes = resContainer.ResultFunction;
+            Float[] yRes = (Float[]) generateResults(x, regressionRes);
+            this.tabWidget.showDataPanel.myTableModel.insertIntoRow(5, yRes);
+            this.tabWidget.showDataPanel.dataTable.repaint();
+            Float[] count = new Float[lineNumber];
+            for (i = 0; i < lineNumber; i++) {
+                count[i] = new Float(i);
+            }
+            tabWidget.clearCharts();
+            kompKey = 1;
+            drawXnPlots(tabWidget.x1Dataset, x[0], resContainer, 0);
+            drawXnPlots(tabWidget.x2Dataset, x[1], resContainer, 1);
+            drawXnPlots(tabWidget.x3Dataset, x[2], resContainer, 2);
+            drawPlot(tabWidget.resultDataset, count, yRes, regressionRes.toString());
+            drawPlot(tabWidget.resultDataset, count, y, "experiment");
+            tabWidget.resultPlotRenderer.setSeriesLinesVisible(0, true);
+            tabWidget.resultPlotRenderer.setSeriesLinesVisible(1, false);
+            tabWidget.resultPlotGotPlot.setRenderer(tabWidget.resultPlotRenderer);
+            tabWidget.x1Results.TableModel.insertIntoRow(0, x[0]);
+            tabWidget.x2Results.TableModel.insertIntoRow(0, x[1]);
+            tabWidget.x3Results.TableModel.insertIntoRow(0, x[2]);
+            tabWidget.x1Results.TableModel.insertIntoRow(1, resContainer.yXn[0]);
+            tabWidget.x2Results.TableModel.insertIntoRow(1, resContainer.yXn[1]);
+            tabWidget.x3Results.TableModel.insertIntoRow(1, resContainer.yXn[2]);
+            for (i = 2; i < 8; i++)//fills data to xn tables
+            {
+                tabWidget.x1Results.TableModel.insertIntoRow(i, functionResSequence(x[0], resContainer.functions[0][i - 2]));
+                tabWidget.x2Results.TableModel.insertIntoRow(i, functionResSequence(x[1], resContainer.functions[1][i - 2]));
+                tabWidget.x3Results.TableModel.insertIntoRow(i, functionResSequence(x[2], resContainer.functions[2][i - 2]));
+            }
+        } catch (FileNotFoundException ex) {
+            throw new RuntimeException("Заданный файл не найден!");
+        }
+    }
+    private void drawPlot(XYSeriesCollection dataset, Float[] x, Float[] y, String kompKey) {
+        XYSeries data = new XYSeries(kompKey);
+        for (int i = 0; i < lineNumber; i++) {
+            data.add(x[i], y[i]);
+        }
+        dataset.addSeries(data);
+    }
+    private void drawXnPlots(XYSeriesCollection dataset, Float[] x, ResultsContainer res, int functionN) //functionN = 0..2
+    {
+        int optimalFunctionType = res.optimalFuncIndex[functionN];
+        for (int i = 0; i < 6; i++) {
+            String kompKey = "y" + (i + 1) + " = " + res.functions[functionN][i].toString();//label
+            if (i == optimalFunctionType)
+                kompKey = kompKey + " Optimal";
+            drawPlot(dataset, x, functionResSequence(x, res.functions[functionN][i]), kompKey);
+        }
+    }
+    private Object[] generateResults(Float[][] x, RegressionResFunc func) //returns array of function vals
+    {
+        Object[] result = new Float[lineNumber];
+        for (int i = 0; i < lineNumber; i++) {
+            result[i] = func.calculate(x[0][i], x[1][i], x[2][i]);
+        }
+        return result;
+    }
+    private Float[] functionResSequence(Float[] x, MathFunc func)//almost the same as generateResults, but for MathFunc
+    {
+        Float[] res = new Float[lineNumber];
+        for (int i = 0; i < lineNumber; i++) {
+            res[i] = func.calculate(x[i]);
+        }
+        return res;
+    }
+}
+
+Maths.java
+
+package src;
+public class Maths {
+    private final float a;
+    private final float b;
+    private final int type;
+    public Maths(float a, float b, int type) {
+        this.a = a;
+        this.b = b;
+        this.type = type;
+    }
+
+    public float calculate(float x) {
+        return switch (type) {
+            case 0 -> a * x + b;
+            case 1 -> 1 / (a * x + b);
+            case 2 -> a / x + b;
+            case 3 -> (float) Math.pow(x, a) * b;
+            case 4 -> (float) Math.exp(a * x) * b;
+            case 5 -> a * (float) Math.log(x) + b;
+            default -> 0;
+        };
+    }
+    public int getType() {
+        return type;
+    }
+    @Override
+    public String toString() {
+        return switch (type) {
+            case 0 -> a + " * x + " + b;
+            case 1 -> "1 / (" + a + " * x + " + b + ")";
+            case 2 -> a + " / x + " + b;
+            case 3 -> "x ^ " + a + " * " + b;
+            case 4 -> "e ^ (x * " + a + ") * " + b;
+            case 5 -> a + " * log(x) + " + b;
+            default -> "";
+        };
+    }
+}
+
+Pr.java
+
+package src;
+public class Pr {
+    private final int m = 3;
+    private final int lineNumber;
+    private Float[][] x;
+    private Float[] y;
+    private float[][] matrixD = new float[4][4];
+    private float yAverage = 0;
+    private Float[] yNormalized;
+    private float[] rYx = new float[3];
+    private final int[] ryxOrder = {0, 1, 2};
+    private MathFunc[] resultFunctions = new MathFunc[3];
+    ResultsContainer results;
+    Pr(int lineNumber) {
+        this.lineNumber = lineNumber;
+        yNormalized = new Float[lineNumber];
+    }
+
+    public ResultsContainer calculate(Float[][] x, Float[] y) {
+        this.x = x;
+        this.y = y;
+        results = new ResultsContainer(lineNumber);
+        getYAverage();
+        normalyzeY();
+        fillMatrixD();
+        fillRyx();
+        sortRyx();
+        functionBuild();
+        results.ResultFunction = new RegressionResFunc(yAverage, resultFunctions[0], resultFunctions[1], resultFunctions[2]);
+        return results;
+    }
+
+    private void getYAverage() {
+        for (int i = 0; i < lineNumber; i++) {
+            this.yAverage += this.y[i];
+        }
+        this.yAverage = this.yAverage / this.lineNumber;
+    }
+    private void normalyzeY() {
+        for (int i = 0; i < lineNumber; i++)
+            this.yNormalized[i] = this.y[i] / this.yAverage;
+    }
+    private float ryxK(Float[] x, Float[] y) { //22, 22
+        float sumX = 0;
+        float sumY = 0;
+        float sumXY = 0;
+        float sumXSq = 0;
+        float sumYSq = 0;
+        for (int i = 0; i < lineNumber; i++) {
+            sumX += x[i];
+            sumY += y[i];
+            sumXY += x[i] * y[i];
+            sumXSq += x[i] * x[i];
+            sumYSq += y[i] * y[i];
+        }
+        return (lineNumber * sumXY - sumX * sumY) / (float) Math.sqrt((lineNumber * sumXSq - sumX * sumX) * (lineNumber * sumYSq - sumY * sumY));
+    }
+    // заполнение матрицы matrix_D
+    private void fillMatrixD() {
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j <= i; j++) {
+                if (i == j)
+                    this.matrixD[i][j] = 1;
+                else if (i == 3)
+                    this.matrixD[i][j] = ryxK(y, x[j]);
+                else
+                    this.matrixD[i][j] = ryxK(x[i], x[j]);
+
+                this.matrixD[j][i] = matrixD[i][j];
+            }
+        }
+    }
+    // Счёт детерминанта
+    private float det(int a, int b) { 
+        int ind = 0;
+        float[] els = new float[9];
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                if ((i != a) & (j != b)) {
+                    els[ind] = this.matrixD[i][j];
+                    ind++;
+                }
+            }
+        }
+        return els[0] * els[4] * els[8] + els[1] * els[5] * els[6] + els[3] * els[7] * els[2];
+    }
+    private void fillRyx() {
+        //заполнение corellation_coof_ryx
+        for (int k = 0; k < this.m; k++) {
+            this.rYx[k] = (float) (Math.abs(det(m, k) / Math.sqrt(det(m, m) * det(k, k))));
+        }
+    }
+    private void sortRyx() {  // сортировка пузырьком
+        float fbuf;
+        int ibuf;
+        for (int i = 1; i < 3; i++) {
+            for (int j = i; j < 3; j++) {
+                if (this.rYx[j - 1] < this.rYx[j]) {
+                    fbuf = this.rYx[j - 1];
+                    this.rYx[j - 1] = this.rYx[j];
+                    this.rYx[j] = fbuf;
+
+                    ibuf = this.ryxOrder[j - 1];
+                    this.ryxOrder[j - 1] = this.ryxOrder[j];
+                    this.ryxOrder[j] = ibuf;
+                }
+            }
+        }
+    }
+    private void functionBuild() {
+        for (int i = 0; i < 3; i++) {
+            Maths result = functionSelection(this.x[this.ryxOrder[i]], this.yNormalized, i); //подбор оптимальной зависимости для x[i]
+            this.resultFunctions[i] = result; //сохранение функции-результата
+            for (int j = 0; j < lineNumber; j++) {
+                this.yNormalized[j] = this.yNormalized[j] / result.calculate(x[this.ryxOrder[i]][j]); //избавляемся от влияния x[i]
+            }
+        }
+    }
+    private MathFunc functionSelection(Float[] x, Float[] y, int functionIndex) {
+        float[] A = new float[6];
+        float[] B = new float[6];
+        float[] a = new float[6];
+        float[] b = new float[6];
+        System.arraycopy(y, 0, this.results.yXn[functionIndex], 0, y.length);
+        System.out.println("=====================");
+        for (int i = 0; i < 22; i++) {
+            System.out.println(y[i]);
+        }
+        float[] deviationSum = new float[6]; // набор из 6 пар a b, описанных ниже некоторые надо преодразовать в соответствии с уравнениями ниже
+	    /*
+	    все уравнения приводятся к виду линейному виду: Y = A * X + B
+	    function type 1.
+		    y = a * x + b
+		    A = a => a = A
+		    B = b => b = B
+	    function type 2.
+		    y = 1/(a * x + b) => 1/y = a * x + b
+		    Y = 1/y
+	    function type 3.
+		    y = a/x + b
+		    X = 1/x
+	    function type 4.
+		    y = b * x ^ a => ln y = a * ln x + ln b
+		    Y = ln y
+		    B = ln b => b = e^B
+		    A = a
+		    X = ln x
+	    function type 5.
+		    y = b * e ^ ( a * x ) => ln y = a * x + ln b
+		    Y = ln y
+		    B = ln b => b = e^B
+	    function type 6.
+		    y = a * ln x + b
+		    X = ln x
+		    Y = y
+	    */
+
+        // подготовка массивов ввода по условиям выше
+        Float[] yPowMinOne = new Float[lineNumber];
+        Float[] xPowMinOne = new Float[lineNumber];
+        Float[] lnX = new Float[lineNumber];
+        Float[] lnY = new Float[lineNumber];
+        for (int i = 0; i < lineNumber; i++) {
+            yPowMinOne[i] = 1 / y[i];
+            xPowMinOne[i] = 1 / x[i];
+            lnX[i] = (float) Math.log(x[i]);
+            lnY[i] = (float) Math.log(y[i]);
+        }
+        float[] res; //stores function result
+        //type 1
+        res = mnkLinear(x, y);
+        A[0] = res[0];
+        B[0] = res[1];
+        //type 2
+        res = mnkLinear(x, yPowMinOne);
+        A[1] = res[0];
+        B[1] = res[1];
+        //type 3
+        res = mnkLinear(xPowMinOne, y);
+        A[2] = res[0];
+        B[2] = res[1];
+        //type 4
+        res = mnkLinear(lnX, lnY);
+        A[3] = res[0];
+        B[3] = (float) Math.exp(res[1]);
+        //type 5
+        res = mnkLinear(x, lnY);
+        A[4] = res[0];
+        B[4] = (float) Math.exp(res[1]);
+        //type 6
+        res = mnkLinear(lnX, y);
+        A[5] = res[0];
+        B[5] = res[1];
+        a[0] = A[0];
+        b[0] = B[0];
+        a[1] = A[1];
+        b[1] = B[1];
+        a[2] = A[2];
+        b[2] = B[2];
+        a[3] = A[3];
+        b[3] = (float) Math.exp(B[3]);
+        a[4] = A[4];
+        b[4] = (float) Math.exp(B[4]);
+        a[5] = A[5];
+        b[5] = B[5];
+        for (int i = 0; i < lineNumber; i++) {
+            deviationSum[0] += Math.pow((y[i] - (a[0] * x[i] + b[0])), 2);
+            deviationSum[1] += Math.pow((y[i] - 1 / (a[1] * x[i] + b[1])), 2);
+            deviationSum[2] += Math.pow((y[i] - (a[2] / x[i] + b[2])), 2);
+            deviationSum[3] += Math.pow((y[i] - (Math.pow(x[i], a[3]) * b[3])), 2);
+            deviationSum[4] += Math.pow((y[i] - (Math.exp(a[4] * x[i]) * b[4])), 2);
+            deviationSum[5] += Math.pow((y[i] - (a[5] * Math.log(x[i]) + b[5])), 2);
+        }
+        float mn = deviationSum[0];
+        int functionType = 7;
+        //чем меньше отклонение тем лучше
+        for (int i = 0; i < 6; i++) {
+            if (deviationSum[i] <= mn) {
+                functionType = i;
+                mn = deviationSum[i];
+            }
+        }
+        results.optimalFuncIndex[functionIndex] = functionType;
+        for (int i = 0; i < 6; i++) {
+            results.functions[functionIndex][i] = new MathFunc(a[i], b[i], i);
+        }
+
+        return new MathFunc(a[functionType], b[functionType], functionType);
+    }
+    private float[] mnkLinear(Float[] x, Float[] y) { // returns a and b
+        float sumX = 0;
+        float sumY = 0;
+        float sumXY = 0;
+        float sumXSq = 0;
+        //подсчёт коофицентов
+        for (int i = 0; i < 8; i++) {
+            sumX += x[i];
+            sumY += y[i];
+            sumXY += x[i] * y[i];
+            sumXSq += x[i] * x[i];
+        }
+        float[] res = new float[2];
+        res[0] = (lineNumber * sumXY - sumX * sumY) / (lineNumber * sumXSq - sumX * sumX);
+        res[1] = (sumXSq * sumY - sumX * sumXY) / (lineNumber * sumXSq - sumX * sumX);
+        return res;//[a, b]
+    }
+    private void printResultTable() {
+        for (int i = 0; i < lineNumber; i++) {
+            float yRegression = (yAverage * resultFunctions[0].calculate(x[ryxOrder[0]][i]) *
+                    resultFunctions[1].calculate(x[ryxOrder[1]][i]) *
+                    resultFunctions[2].calculate(x[ryxOrder[2]][i]));
+            System.out.println(x[0][i] + " " + x[1][i] + " " + x[2][i] + " " + y[i] + " " + yRegression);
+        }
+    }
+}
+
+Regress.java
+
+package src;
+public class Regress {
+    private final MathFunc func1;
+    private final MathFunc func2;
+    private final MathFunc func3;
+    private final float yAverage;
+    public Regress(float yAverage, MathFunc func1, MathFunc func2, MathFunc func3) {
+        this.yAverage = yAverage;
+        this.func1 = func1;
+        this.func2 = func2;
+        this.func3 = func3;
+    }
+    public float calculate(float x1, float x2, float x3) {
+        return this.yAverage * func1.calculate(x1) * func2.calculate(x2) * func3.calculate(x3);
+    }
+    public String toString() {
+        return this.yAverage + "*" + func1.toString() + "*\n" + func2.toString() + "*" + func3.toString();
+    }
+    public Maths getFunc1() {
+        return func1;
+    }
+    public Maths getFunc2() {
+        return func2;
+    }
+    public Maths getFunc3() {
+        return func3;
+    }
+}
+
+Result.java
+
+package src;
+public class Result {
+    float yAverage;
+    Regress ResultFunction;
+    MathFunc[][] functions;
+    int[] optimalFuncIndex;
+    Float[][] yXn;
+    int lineNumber;
+    ResultsContainer(int lineNumber) {
+        optimalFuncIndex = new int[3];
+        functions = new MathFunc[3][6];
+        this.lineNumber = lineNumber;
+        yXn = new Float[3][lineNumber];
+    }
+}
+
+Widget.java
+
+package src;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.ChartPanel;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.chart.plot.XYPlot;
+import org.jfree.chart.renderer.xy.XYLineAndShapeRenderer;
+import org.jfree.data.xy.XYSeriesCollection;
+import javax.swing.*;
+class TabWidget extends JTabbedPane {
+    ChartPanel resultPLot;
+    ChartPanel firstParameterPLot;
+    ChartPanel secondParameterPLot;
+    ChartPanel thirdParameterPLot;
+    ExperimentalDataPanel showDataPanel;
+    XnResultsPanel x1Results;
+    XnResultsPanel x2Results;
+    XnResultsPanel x3Results;
+    JFreeChart chartX1;
+    JFreeChart chartX2;
+    JFreeChart chartX3;
+    JFreeChart chartResult;
+    XYSeriesCollection x1Dataset;
+    XYSeriesCollection x2Dataset;
+    XYSeriesCollection x3Dataset;
+    XYSeriesCollection resultDataset;
+    XYLineAndShapeRenderer resultPlotRenderer;
+    XYPlot resultPlotGotPlot;
+    Widget(int lineNumber) {
+        super(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT);
+        showDataPanel = new ExperimentalDataPanel(lineNumber);
+        x1Dataset = new XYSeriesCollection();
+        chartX1 = ChartFactory.createXYLineChart("y(x1))",
+                "x1", "y(x1)", x1Dataset, PlotOrientation.VERTICAL, true, false, false);
+        firstParameterPLot = new ChartPanel(chartX1);
+        x2Dataset = new XYSeriesCollection();
+        chartX2 = ChartFactory.createXYLineChart("y(x2))",
+                "x2", "y(x2)", x2Dataset, PlotOrientation.VERTICAL, true, false, false);
+        secondParameterPLot = new ChartPanel(chartX2);
+        x3Dataset = new XYSeriesCollection();
+        chartX3 = ChartFactory.createXYLineChart("y(x3))",
+                "x3", "y(x3)", x3Dataset, PlotOrientation.VERTICAL, true, false, false);
+        thirdParameterPLot = new ChartPanel(chartX3);
+        resultDataset = new XYSeriesCollection();
+        chartResult = ChartFactory.createScatterPlot("y(n)",
+                "n", "y(n)", resultDataset, PlotOrientation.VERTICAL, true, false, false);
+        resultPLot = new ChartPanel(chartResult);
+        resultPlotGotPlot = (XYPlot) chartResult.getPlot();
+        resultPlotRenderer = new XYLineAndShapeRenderer();
+        x1Results = new XnResultsPanel(lineNumber);
+        x2Results = new XnResultsPanel(lineNumber);
+        x3Results = new XnResultsPanel(lineNumber);
+        //add panels to tab widget
+        add("data", showDataPanel);
+        add("x1", firstParameterPLot);
+        add("x1 table", x1Results);
+        add("x2", secondParameterPLot);
+        add("x2 table", x2Results);
+        add("x3", thirdParameterPLot);
+        add("x3 table", x3Results);
+        add("results", resultPLot);
+    }
+    public void clearCharts() {
+        x1Dataset.removeAllSeries();
+        x2Dataset.removeAllSeries();
+        x3Dataset.removeAllSeries();
+        resultDataset.removeAllSeries();
+    }
+}
+
+PanelOfResults.java
+
+package src;
+import javax.swing.*;
+import java.awt.*;
+public class PanelOfResults extends Panel {
+    PanelOfResultsModel TableModel;
+    JTable dataTable;
+    PanelOfResults(int lineNumber) {
+        super();
+        setLayout(new GridLayout());
+        TableModel = new ResTableModel(lineNumber);
+        dataTable = new JTable(TableModel);
+        dataTable.setRowHeight(23);
+        add(dataTable);
+        JScrollPane scrollPane = new JScrollPane(dataTable);
+   scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+        scrollPane.setBounds(5, 10, 300, 150);
+        scrollPane.setVisible(true);
+        add(scrollPane);
+    }
+}
+
+ResTableModel.java
+
+package src;
+import javax.swing.table.AbstractTableModel;
+public class ResTableModel extends AbstractTableModel {
+    private int lineNumber;
+    final private String[] columnNames = {
+            "x",
+            "y_exp",
+            "y1",
+            "y2",
+            "y3",
+            "y4",
+            "y5",
+            "y6"
+    };
+    Object[][] data;
+    ResTableModel(int lineNumber) {
+        super();
+        this.lineNumber = lineNumber;
+        data = new Object[this.lineNumber][columnNames.length];
+        for (int i = 0; i < this.lineNumber; i++) {
+            for (int j = 0; j < columnNames.length; j++) {
+                data[i][j] = " ";
+            }
+        }
+    }
+    @Override
+    public boolean isCellEditable(int row, int column) {
+        return column != 0;
+    }
+    public int getColumnCount() {
+        return columnNames.length;
+    }
+    public int getRowCount() {
+        return data.length;
+    }
+    public String getColumnName(int col) {
+        return columnNames[col];
+    }
+    public Object getValueAt(int row, int col) {
+        return data[row][col].toString();
+    }
+    public void insertIntoRow(int rowId, Object[] rowData) {
+        for (int i = 0; i < this.getRowCount(); i++) {
+            data[i][rowId] = rowData[i];
+        }
+    }
+    @Override
+    public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
+        if (this.isCellEditable(rowIndex, columnIndex)) {
+            this.data[rowIndex][columnIndex] = aValue;
+        }
+    }
+}
+
+ExpData.java
+package src;
+import javax.swing.*;
+import java.awt.*;
+class ExpData extends Panel {
+    JTable dataTable;
+    ExpDataModel myTableModel
+    ExpData(int lineNumber) {
+        super();
+        setLayout(new GridLayout());
+
+        myTableModel = new ExpDataTable(lineNumber);
+        dataTable = new JTable(myTableModel);
+        dataTable.setRowHeight(23);
+        add(dataTable);
+        JScrollPane scrollPane = new JScrollPane(dataTable);
+       scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_ALWAYS);
+        scrollPane.setBounds(5, 10, 300, 150);
+        scrollPane.setVisible(true);
+        add(scrollPane);
+    }
+}
+
+ExpDataTable.java
+
+package src;
+import javax.swing.table.AbstractTableModel;
+class ExperimentDataTableModel extends AbstractTableModel {
+    final private String[] columnNames = {
+            "N",
+            "x1",
+            "x2",
+            "x3",
+            "y_exp",
+            "y_calc"
+    };
+    final Object[][] data;
+    ExperimentDataTableModel(int lineNumber) {
+        super();
+        data = new Object[lineNumber][6];
+        for (int i = 0; i < lineNumber; i++) {
+            data[i][0] = i + 1;
+            for (int j = 1; j < 6; j++) {
+                data[i][j] = " ";
+            }
+        }
+    }
+    @Override
+    public boolean isCellEditable(int row, int column) {
+        return column != 0;
+    }
+    public int getColumnCount() {
+        return columnNames.length;
+    }
+    public int getRowCount() {
+        return data.length;
+    }
+    public String getColumnName(int col) {
+        return columnNames[col];
+    }
+    public Object getValueAt(int row, int col) {
+        return data[row][col].toString();
+    }
+    public void insertIntoRow(int rowId, Object[] rowData) {
+        for (int i = 0; i < this.getRowCount(); i++)
+            data[i][rowId] = rowData[i];
+    }
+    @Override
+    public void setValueAt(Object aValue, int rowIndex, int columnIndex) {
+        if (this.isCellEditable(rowIndex, columnIndex)) {
+            this.data[rowIndex][columnIndex] = aValue;
+        }
+    }
+}
